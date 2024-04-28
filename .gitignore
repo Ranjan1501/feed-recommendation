@@ -1,0 +1,7 @@
+/.env
+/Dockerfile
+/db.js
+/docker-compose.yml
+/index.js
+/node_modules
+/server.js
