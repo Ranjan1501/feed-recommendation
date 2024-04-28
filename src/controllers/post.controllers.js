@@ -33,38 +33,107 @@ router.get("/recommendation/posts/:userId", async (req, res) => {
   const { userId } = req.params;
   console.log("userId: ", userId);
   try {
-    // calculate popularity score based on like and comments
-    const totalLikesByUser = await pool.query(
-      "SELECT COUNT(*) FROM likes WHERE user_id = $1",
-      [userId]
-    );
-    const likes = totalLikesByUser.rows[0].count;
-    console.log("totalLikesByUser: ", likes);
-
-    //  // calculate popularity score based on like and comments
-    const totalCommentByUser = await pool.query(
-      "SELECT COUNT(*) FROM comments WHERE user_id = $1",
-      [userId]
-    );
-    const comments = totalCommentByUser.rows[0].count;
-    console.log("totalCommentByUser: ", comments);
-
     // get all followed user_id by this user
     const follweredByUser = await pool.query(
       "SELECT * FROM friendList WHERE follower_id = $1",
       [userId]
     );
 
-    const allFollowedUserId = follweredByUser.rows[0].friend_id;
-    console.log("follweredByUser: ", allFollowedUserId);
+    console.log("follweredByUser: ", follweredByUser);
+
+    const allFollowedUserId =
+      follweredByUser &&
+      follweredByUser.rows[0] &&
+      follweredByUser.rows[0].friend_id
+        ? follweredByUser.rows[0].friend_id
+        : null;
+    console.log("allFollowedUserId: ", allFollowedUserId);
+
+    let followerArray = follweredByUser.rows.map((item) => {
+      console.log("item: ", item);
+      return item.friend_id;
+    });
+
+    if (followerArray.length === 0 || allFollowedUserId === null) {
+      const generalPost = await pool.query("SELECT * FROM posts");
+      return res.json(generalPost.rows);
+    }
+
+    // console.log("allFollowedUser: ", follweredByUser.rows);
+
+    // console.log("User In Row: ", follweredByUser);
+
+    console.log("followerArray: ", followerArray);
 
     // get all post with user id
-    const data = await pool.query(
+    /*
+    const postData = await pool.query(
       "SELECT * FROM posts WHERE published_by = $1",
       [allFollowedUserId]
     );
+    let postId = postData.rows[0].id;
+    // fetch like and comment as per post id
 
-    res.json(data.rows);
+    const totalLikesOnPost = await pool.query(
+      "SELECT COUNT(*) FROM likes WHERE post_id = $1",
+      [postId]
+    );
+    const postLikes = totalLikesOnPost.rows[0].count;
+    console.log("totalLikesOnPost: ", postLikes);
+
+    //  // calculate popularity score based on like and comments
+    const totalCommentsOnPost = await pool.query(
+      "SELECT COUNT(*) FROM comments WHERE post_id = $1",
+      [postId]
+    );
+    const postComments = totalCommentsOnPost.rows[0].count;
+    console.log("totalCommentsOnPost: ", postComments);
+
+    const popularityScore = parseInt(postLikes) + parseInt(postComments);
+    console.log("popularityScore: ", popularityScore);
+    */
+
+    // sort data with score and return in the feed
+
+    // check if no friend or follower then redirect to general post api/post
+
+    const sortedFeedByScore = await pool.query(
+      `SELECT
+            p.*,
+            COALESCE(l.total_likes, 0) AS total_likes,
+            COALESCE(c.total_comments, 0) AS total_comments,
+            COALESCE(l.total_likes, 0) + COALESCE(c.total_comments, 0) AS popularityScore
+        FROM
+            posts p
+        LEFT JOIN (
+            SELECT
+                post_id,
+                COUNT(*) AS total_likes
+            FROM
+                likes
+            GROUP BY
+                post_id
+        ) l ON p.id = l.post_id
+        LEFT JOIN (
+            SELECT
+                post_id,
+                COUNT(*) AS total_comments
+            FROM
+                comments
+            GROUP BY
+                post_id
+        ) c ON p.id = c.post_id
+        WHERE
+            p.published_by = ANY($1::int[])
+        ORDER BY
+            popularityScore DESC;
+        `,
+      [followerArray]
+    );
+
+    console.log("sortedFeedByScore : ", sortedFeedByScore.rows);
+    // console.log("sortedFeed : ", sortedFeedByScore);
+    res.json(sortedFeedByScore.rows);
   } catch (err) {
     console.log(err);
     res.sendStatus({ status: 500, message: err.message });
