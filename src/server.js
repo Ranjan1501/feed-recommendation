@@ -55,6 +55,6 @@ app.use(express.json());
 //     res.sendStatus(500);
 //   }
 // });
-app.use("/posts", postController);
+app.use("/api", postController);
 
 app.listen(port, () => console.log(`Server has started on port: ${port}`));
