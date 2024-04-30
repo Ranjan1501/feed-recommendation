@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../config/db");
-
+const redis = require("redis");
+const client = redis.createClient();
 const router = express.Router();
 
 router.get("/posts", async (req, res) => {
