@@ -1,7 +1,8 @@
 const express = require("express");
 const pool = require("../config/db");
 const redis = require("redis");
-const client = redis.createClient();
+const cacheMiddleware = require("../middleware/cacheMiddleware");
+
 const router = express.Router();
 
 router.get("/posts", async (req, res) => {
@@ -14,14 +15,16 @@ router.get("/posts", async (req, res) => {
   }
 });
 
-router.get("/posts/:userId", async (req, res) => {
-  const { userId } = req.params;
-  console.log("userId: ", userId);
+router.get("/posts/:userId", cacheMiddleware, async (req, res) => {
   try {
+    const { userId } = req.params;
+    const cacheKey = req.originalUrl;
+    console.log("userId: ", userId);
     const data = await pool.query(
       "SELECT * FROM posts WHERE published_by = $1",
       [userId]
     );
+    await client.set(cacheKey, JSON.stringify(data.rows), "Ex", 120);
     res.json(data.rows);
   } catch (err) {
     console.log(err);
@@ -29,12 +32,10 @@ router.get("/posts/:userId", async (req, res) => {
   }
 });
 
-// recommendation api
 router.get("/recommendation/posts/:userId", async (req, res) => {
   const { userId } = req.params;
   console.log("userId: ", userId);
   try {
-    // get all followed user_id by this user
     const follweredByUser = await pool.query(
       "SELECT * FROM friendList WHERE follower_id = $1",
       [userId]
@@ -59,30 +60,18 @@ router.get("/recommendation/posts/:userId", async (req, res) => {
       const generalPost = await pool.query("SELECT * FROM posts");
       return res.json(generalPost.rows);
     }
-
-    // console.log("allFollowedUser: ", follweredByUser.rows);
-
-    // console.log("User In Row: ", follweredByUser);
-
     console.log("followerArray: ", followerArray);
-
-    // get all post with user id
-    /*
     const postData = await pool.query(
       "SELECT * FROM posts WHERE published_by = $1",
       [allFollowedUserId]
     );
     let postId = postData.rows[0].id;
-    // fetch like and comment as per post id
 
     const totalLikesOnPost = await pool.query(
       "SELECT COUNT(*) FROM likes WHERE post_id = $1",
       [postId]
     );
     const postLikes = totalLikesOnPost.rows[0].count;
-    console.log("totalLikesOnPost: ", postLikes);
-
-    //  // calculate popularity score based on like and comments
     const totalCommentsOnPost = await pool.query(
       "SELECT COUNT(*) FROM comments WHERE post_id = $1",
       [postId]
@@ -91,12 +80,6 @@ router.get("/recommendation/posts/:userId", async (req, res) => {
     console.log("totalCommentsOnPost: ", postComments);
 
     const popularityScore = parseInt(postLikes) + parseInt(postComments);
-    console.log("popularityScore: ", popularityScore);
-    */
-
-    // sort data with score and return in the feed
-
-    // check if no friend or follower then redirect to general post api/post
 
     const sortedFeedByScore = await pool.query(
       `SELECT
@@ -133,7 +116,6 @@ router.get("/recommendation/posts/:userId", async (req, res) => {
     );
 
     console.log("sortedFeedByScore : ", sortedFeedByScore.rows);
-    // console.log("sortedFeed : ", sortedFeedByScore);
     res.json(sortedFeedByScore.rows);
   } catch (err) {
     console.log(err);
