@@ -1,2 +1,7 @@
 /.env
 /node_modules
+/index.js
+/config/redisClient.js
+/controllers/redisClient.js
+/controllers/cacheMiddleWare.js
+
