@@ -1,16 +1,3 @@
-// const redis = require("redis");
-
-// const client = redis.createClient(6379, "172.20.0.4");
-
-// (async () => {
-//   try {
-//     await client.connect();
-//     console.log("Connected to Redis successfully");
-//   } catch (error) {
-//     console.error("Redis connection error from middleware:", error);
-//     process.exit(1); // Exit on connection failure
-//   }
-// })();
 const Redis = require("ioredis");
 const client = new Redis({
   port: process.env.redis_port,
